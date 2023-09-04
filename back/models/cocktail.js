@@ -4,7 +4,7 @@ const DB = require('../db.config')
 const Cocktail = DB.define('Cocktail', {
     id: {
         type: DataTypes.INTEGER(10),
-        primarykey: true,
+        primaryKey: true,
         autoIncrement: true
     },
     user_id: {

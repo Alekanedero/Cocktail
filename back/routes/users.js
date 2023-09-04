@@ -1,4 +1,6 @@
 const express = require('express')
+const bcrypt = require('bcrypt')
+
 const User = require('../models/user')
 
 /* récupération du router */
@@ -6,14 +8,16 @@ let router = express.Router()
 
 /* routage de la ressource User */
 
-//pour tout récupérer
+
+// pour l'ensemble des utilisateurs
 router.get('', (req, res) => {
     User.findAll()
         .then( user => res.json({ data: user}))
         .catch(err => res.status(500).json({ message: 'Database Error', error: err }))
 })
 
-//récupérer un utilisateur par son id
+
+// récupérer un utilisateur préciser par son id, et cette id préciser dans url
 router.get('/:id', (req, res) => {
     let userId = parseInt(req.params.id)
 
@@ -35,7 +39,8 @@ router.get('/:id', (req, res) => {
         .catch(err => res.status(500).json({ message: 'Database Error', error: err}) )
 })
 
-//pour ajouter une ressource
+
+// pour créer, ajouter une ressource
 router.put('', (req, res) => {
     const {nom, prenom, pseudo, email, password } = req.body
 
@@ -52,17 +57,95 @@ router.put('', (req, res) => {
                 return res.status(409).json({ message: `The user ${nom} already exists !`})
             }
 
-            User.create(req.body)
-                .then(user => res.json({ message: 'User Created', data:user}))
-                .catch(err => res.status(500).json({ message: 'Database Error', error: err}) )
+            // Hashage du mot de passe utilisateur
+            bcrypt.hash(password, parseInt(process.env.BCRYPT_SALT_ROUND))
+                .then(hash => {
+                    req.body.password = hash
+
+                    // création de l'utilisateur
+                    User.create(req.body)
+                        .then(user => res.json({ message: 'User Created', data:user}))
+                        .catch(err => res.status(500).json({ message: 'Database Error', error: err}) )
+                })
+                .catch(err => res.status(500).json({message: 'Hash Process Error', error: err}))
+
+
         })
         .catch(err => res.status(500).json({ message: 'Database Error', error: err}) )
 })
 
-//modifier une ressource
-router.patch('/;id')
 
-//supprimer une ressource
-router.delete('/:id')
+// modifier une ressource qui existe avec un id dans l'url
+router.patch('/:id', (req, res) => {
+    let userId = parseInt(req.params.id)
+
+    // vérification si le champ id est présent et cohérent
+    if(!userId){
+        return res.status(400).json({message: 'Missing parameter'})
+    }
+
+    //Recherche de l'utilisateur
+    User.findOne({ where: {id: userId}, raw: true})
+        .then(user => {
+            //vérifier si l'utilisateur existe
+            if(user === null){
+                return res.status(404).json({message: 'This user does not exist !'})
+            }
+
+            // Mise à jour de l'utilisateur
+            User.update(req.body, { where: {id: userId}})
+                .then(user => res.json({ message: 'User Updated'}))
+                .catch(err => res.status(500).json({ message: 'Database Error', error: err}))
+        })
+        .catch(err => res.status(500).json({ message: 'Database Error', error: err}))
+})
 
 
+// récupérer le mot de passe de la poubelle
+router.post('/untrash/:id', (req, res) => {
+    let userId = parseInt(req.params.id)
+
+    // vérification si le champ id est présent et cohérent
+    if(!userId){
+        return res.status(400).json({message: 'Missing parameter'})
+    }
+
+    User.restore({ where: {id: userId} })
+        .then(() => res.status(204).json({}))
+        .catch(err => res.status(500).json({ message: 'Database Error', error: err}))
+})
+
+
+// mettre a la poubelle
+router.delete('/trash/:id', (req, res) => {
+    let userId = parseInt(req.params.id)
+
+    // vérification si le champ id est présent et cohérent
+    if(!userId){
+        return res.status(400).json({message: 'Missing parameter'})
+    }
+
+    // Suppression de l'utilisateur
+    User.destroy({ where: {id: userId}})
+        .then(() => res.status(204).json({}))
+        .catch(err => res.status(500).json({ message: 'Database Error', error: err}))
+})
+
+
+// supprimer complétement l'id de ma base de donnée
+router.delete('/:id', (req, res) => {
+    let userId = parseInt(req.params.id)
+
+    // vérification si le champ id est présent et cohérent
+    if(!userId){
+        return res.status(400).json({message: 'Missing parameter'})
+    }
+
+    // Supression de l'utilisateur
+    User.destroy({ where: {id: userId}, force: true})
+        .then(() => res.status(204).json({}))
+        .catch(err => res.status(500).json({ message: 'Database Error', error: err}))
+})
+
+
+module.exports = router

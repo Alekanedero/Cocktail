@@ -60,7 +60,7 @@ router.put('', (req, res) => {
 })
 
 //modifier une ressource
-router.patch('/;id') test
+router.patch('/;id')
 
 //supprimer une ressource
 router.delete('/:id')
